@@ -20,11 +20,15 @@ defmodule Day5 do
 
   def part_2(input) do
     ?a..?z
-    |> Task.async_stream(fn letter ->
-      input
-      |> replace_in_string_i(letter)
-      |> part_1()
-    end)
+    |> Task.async_stream(
+      fn letter ->
+        input
+        |> replace_in_string_i(letter)
+        |> part_1()
+      end,
+      max_concurrency: 26,
+      ordered: false
+    )
     |> Enum.map(fn {_, v} -> v end)
     |> Enum.min()
   end

@@ -23,8 +23,13 @@ defmodule Day5 do
     |> Task.async_stream(
       fn letter ->
         input
-        |> replace_in_string_i(letter)
-        |> part_1()
+        |> discard_and_react(<<>>, letter)
+        |> byte_size()
+
+        # Regex method
+        # input
+        # |> replace_in_string_i(letter)
+        # |> part_1()
       end,
       max_concurrency: 26,
       ordered: false
@@ -33,6 +38,21 @@ defmodule Day5 do
     |> Enum.min()
   end
 
+  def discard_and_react(<<>>, acc, _), do: String.reverse(acc)
+
+  def discard_and_react(<<a, rest::binary>>, <<b, acc::binary>>, letter) when abs(a - b) == 32 do
+    discard_and_react(rest, acc, letter)
+  end
+
+  def discard_and_react(<<a, rest::binary>>, acc, letter) when a == letter or a == letter - 32 do
+    discard_and_react(rest, acc, letter)
+  end
+
+  def discard_and_react(<<a, rest::binary>>, acc, letter) do
+    discard_and_react(rest, <<a, acc::binary>>, letter)
+  end
+
+  # This + part_1() isn't much slower than the above method
   def replace_in_string_i(str, char) do
     char = List.to_string([char])
     regex = Regex.compile!(char, "i")

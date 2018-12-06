@@ -11,16 +11,13 @@ defmodule Day5 do
   # Stop condition on empty string; return the reversed accumulator
   def scan_polymer("", acc), do: String.reverse(acc)
 
-  # Edge case: "bAaB" => gets here after "Aa" reaction with "b" in input and "B" in acc
-  def scan_polymer(<<r>>, <<rr>>) when abs(r - rr) == 32, do: ""
-
-  # Stop condition on one character; add it to the accumulator, reverse it and return it
-  def scan_polymer(<<last>>, acc), do: String.reverse(<<last, acc::binary>>)
-
   # Immediate chain reaction clause: "dcbaABCD" chain reaction gets caught here after "aA" is found
   def scan_polymer(<<r, rest::binary>>, <<rr, acc::binary>>) when abs(r - rr) == 32 do
     scan_polymer(rest, acc)
   end
+
+  # Stop condition on one character; add it to the accumulator, reverse it and return it
+  def scan_polymer(<<last>>, acc), do: String.reverse(<<last, acc::binary>>)
 
   # No immediate chain reaction; "AaB..." in input and "c..." in accumulator;
   def scan_polymer(<<first, second, rest::binary>>, acc) when abs(first - second) == 32 do

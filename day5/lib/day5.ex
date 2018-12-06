@@ -4,42 +4,28 @@ defmodule Day5 do
   """
   def part_1(input) do
     input
-    |> scan_polymer("")
-    |> String.length()
+    |> scan_polymer(<<>>)
+    |> byte_size()
   end
 
-  # Stop condition on empty string; return the reversed accumulator
-  def scan_polymer("", acc), do: String.reverse(acc)
+  def scan_polymer(<<>>, acc), do: String.reverse(acc)
 
-  # Immediate chain reaction clause: "dcbaABCD" chain reaction gets caught here after "aA" is found
-  def scan_polymer(<<r, rest::binary>>, <<rr, acc::binary>>) when abs(r - rr) == 32 do
+  def scan_polymer(<<a, rest::binary>>, <<b, acc::binary>>) when abs(a - b) == 32 do
     scan_polymer(rest, acc)
   end
 
-  # Stop condition on one character; add it to the accumulator, reverse it and return it
-  def scan_polymer(<<last>>, acc), do: String.reverse(<<last, acc::binary>>)
-
-  # No immediate chain reaction; "AaB..." in input and "c..." in accumulator;
-  def scan_polymer(<<first, second, rest::binary>>, acc) when abs(first - second) == 32 do
-    scan_polymer(rest, acc)
+  def scan_polymer(<<a, rest::binary>>, acc) do
+    scan_polymer(rest, <<a, acc::binary>>)
   end
 
-  # no chain reaction
-  def scan_polymer(<<first, second, rest::binary>>, acc) do
-    scan_polymer(<<second, rest::binary>>, <<first, acc::binary>>)
-  end
-
-  # an improvement would be to dynamically create the 'units' based on the input instead of going through all possible combinations a-z
   def part_2(input) do
     ?a..?z
-    |> Enum.reduce([], fn letter, acc ->
-      val =
-        input
-        |> replace_in_string_i(letter)
-        |> part_1()
-
-      [val | acc]
+    |> Task.async_stream(fn letter ->
+      input
+      |> replace_in_string_i(letter)
+      |> part_1()
     end)
+    |> Enum.map(fn {_, v} -> v end)
     |> Enum.min()
   end
 

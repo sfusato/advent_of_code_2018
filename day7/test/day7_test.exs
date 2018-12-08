@@ -13,4 +13,31 @@ defmodule Day7Test do
            Step F must be finished before step E can begin.
            """) == "CABDFE"
   end
+
+  test "Day 7 - Part 2 default test case" do
+    assert Day7.part_2(
+             """
+             Step C must be finished before step A can begin.
+             Step C must be finished before step F can begin.
+             Step A must be finished before step B can begin.
+             Step A must be finished before step D can begin.
+             Step B must be finished before step E can begin.
+             Step D must be finished before step E can begin.
+             Step F must be finished before step E can begin.
+             """,
+             2
+           ) == 258
+  end
+
+  test "Day 7 - Part 2" do
+    assert Day7.part_2(
+             """
+             Step C must be finished before step A can begin.
+             Step C must be finished before step B can begin.
+             Step A must be finished before step F can begin.
+             Step B must be finished before step F can begin.
+             """,
+             2
+           ) == 191
+  end
 end

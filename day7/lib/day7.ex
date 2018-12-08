@@ -9,6 +9,13 @@ defmodule Day7 do
     |> execute_instructions()
   end
 
+  def part_2(input, no_workers \\ 5) do
+    input
+    |> parse_and_map()
+    |> sort()
+    |> workers_execute_instructions([], 0, no_workers)
+  end
+
   @doc """
       iex> Day7.parse_and_map(
       ...> \"""
@@ -57,6 +64,8 @@ defmodule Day7 do
       ]
   """
 
+  def sort([]), do: []
+
   def sort(dependency_map) do
     dependency_map
     |> Enum.sort_by(&{length(elem(&1, 1)), elem(&1, 0)})
@@ -87,5 +96,62 @@ defmodule Day7 do
     |> Enum.map(fn {key, steps} ->
       {key, Enum.filter(steps, fn s -> s != step end)}
     end)
+  end
+
+  # Part 2
+  def workers_execute_instructions([], [], total_time, _no_workers), do: total_time
+
+  def workers_execute_instructions(steps, workers, total_time, no_workers)
+      when length(workers) == no_workers do
+    {workers, steps} = go_to_work(workers, steps)
+
+    workers_execute_instructions(steps, workers, total_time + 1, no_workers)
+  end
+
+  def workers_execute_instructions(steps, workers, total_time, no_workers)
+      when length(workers) != no_workers do
+    available_workers = no_workers - length(workers)
+    available_steps = steps |> Enum.filter(fn {_worker, step} -> step == [] end) |> Enum.count()
+    steps_worked_on = min(available_workers, available_steps)
+
+    {work_to_do, rest} = Enum.split(steps, steps_worked_on)
+    work_to_do = Enum.map(work_to_do, fn {step, _} -> step end)
+
+    current_workers =
+      work_to_do
+      |> Enum.map(fn worker ->
+        [codepoint | _] = worker |> to_charlist()
+        {worker, codepoint - 4}
+      end)
+
+    workers = current_workers ++ workers
+
+    {workers, rest} = go_to_work(workers, rest)
+    workers_execute_instructions(rest, workers, total_time + 1, no_workers)
+  end
+
+  def go_to_work(workers, work) do
+    workers =
+      workers
+      |> Enum.map(fn {step, time_left} -> {step, time_left - 1} end)
+
+    work =
+      workers
+      |> Enum.reduce(
+        work,
+        fn
+          {step, 0}, acc -> remove_executed_step(acc, step) |> sort()
+          _, acc -> acc
+        end
+      )
+
+    workers =
+      workers
+      |> Enum.filter(fn
+        {_, 0} -> false
+        _ -> true
+      end)
+
+    {workers, work}
   end
 end

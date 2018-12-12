@@ -69,12 +69,14 @@ defmodule Day11 do
       {232, 251, 12}
   """
   def part_2(serial_no \\ 5791) do
+    summed_area_table = summed_area_table(serial_no)
+
     Task.async_stream(
-      4..30,
+      1..300,
       fn size ->
         Enum.reduce(1..(300 - size), {0, nil, nil}, fn x, acc ->
           Enum.reduce(1..(300 - size), acc, fn y, {max_power, cell, cell_size} ->
-            current_power = grid_power(size, {x, y}, serial_no)
+            current_power = grid_power_sum(summed_area_table, {x, y}, size)
 
             if current_power > max_power do
               {current_power, {x, y}, size}
@@ -84,9 +86,7 @@ defmodule Day11 do
           end)
         end)
       end,
-      ordered: false,
-      max_concurrency: 10,
-      timeout: 120_000
+      ordered: false
     )
     |> Enum.sort_by(fn {_, {power, _, _}} -> power end, &>=/2)
     |> Enum.take(1)
@@ -95,27 +95,45 @@ defmodule Day11 do
   end
 
   @doc """
-  Compute the power of a grid given its size, top-left coordinate and serial number
+  Compute the power of a partial grid within a grid given the summed area table, top-left coordinate and size of the partial grid
 
-      iex> Day11.grid_power(16, {90, 269}, 18)
+      iex> summed_area_table = Day11.summed_area_table(18)
+      iex> Day11.grid_power_sum(summed_area_table, {90, 269}, 16)
       113
-      iex> Day11.grid_power(12, {232, 251}, 42)
+      iex> summed_area_table = Day11.summed_area_table(42)
+      iex> Day11.grid_power_sum(summed_area_table, {232, 251}, 12)
       119
   """
-  def grid_power(size, {x, y}, serial_no) do
-    Enum.map(x..(x + size - 1), fn x ->
-      Enum.reduce(y..(y + size - 1), 0, fn y, acc ->
-        cell_power_level({x, y}, serial_no) + acc
-      end)
-    end)
-    |> Enum.sum()
+  def grid_power_sum(summed_area_table, {x, y}, size) do
+    Map.get(summed_area_table, {x - 1, y - 1}, 0) +
+      Map.get(summed_area_table, {x + size - 1, y + size - 1}, 0) -
+      Map.get(summed_area_table, {x + size - 1, y - 1}, 0) -
+      Map.get(summed_area_table, {x - 1, y + size - 1}, 0)
   end
 
-  # def grid_power(size, {x, y}, serial_no) do
-  #   Enum.reduce(x..(x + size - 1), 0, fn x, acc ->
-  #     Enum.reduce(y..(y + size - 1), acc, fn y, acc ->
-  #       acc + cell_power_level({x, y}, serial_no)
-  #     end)
-  #   end)
-  # end
+  def summed_area_table(serial_no) do
+    Enum.reduce(1..300, %{}, fn y, table ->
+      Enum.reduce(1..300, table, fn x, table ->
+        xy = cell_power_level({x, y}, serial_no)
+
+        sum =
+          case {x, y} do
+            {1, 1} ->
+              xy
+
+            {_, 1} ->
+              xy + Map.fetch!(table, {x - 1, 1})
+
+            {1, _} ->
+              xy + Map.fetch!(table, {x, y - 1})
+
+            {x, y} ->
+              xy + Map.fetch!(table, {x, y - 1}) + Map.fetch!(table, {x - 1, y}) -
+                Map.fetch!(table, {x - 1, y - 1})
+          end
+
+        Map.put(table, {x, y}, sum)
+      end)
+    end)
+  end
 end

@@ -1,6 +1,6 @@
 defmodule Day12 do
   defmodule Pots do
-    defstruct current_state: [], spread_rules: %{}, leftmost: 0
+    defstruct current_state: MapSet.new(), spread_rules: MapSet.new()
   end
 
   @moduledoc """
@@ -9,17 +9,8 @@ defmodule Day12 do
   def part_1(input \\ File.read!("./input.txt")) do
     input
     |> parse_input()
-    |> grow_pots_generations(20)
-    |> Map.take([:current_state, :leftmost])
-    |> compute_sum()
-  end
-
-  def part_2(input \\ File.read!("./input.txt")) do
-    input
-    |> parse_input()
-    |> grow_pots_generations(5_000)
-    |> Map.take([:current_state, :leftmost])
-    |> compute_sum()
+    |> pass_generations(20)
+    |> count_total()
   end
 
   def parse_input(input) do
@@ -35,8 +26,12 @@ defmodule Day12 do
     initial_state =
       initial_state
       |> String.graphemes()
+      |> Enum.with_index()
+      |> Enum.filter(&match?({"#", _}, &1))
+      |> Enum.map(&elem(&1, 1))
+      |> MapSet.new()
 
-    %Pots{state | current_state: initial_state, leftmost: 0}
+    %Pots{state | current_state: initial_state}
   end
 
   def build_spread_rules_map(state, spread_rules) do
@@ -44,79 +39,78 @@ defmodule Day12 do
       spread_rules
       |> String.split("\r\n", trim: true)
       |> Enum.map(&String.split(&1, " => ", trim: true))
-      |> Enum.reduce(%{}, fn [pattern, result], acc ->
-        pattern = pattern |> String.graphemes()
-        Map.put(acc, pattern, result)
+      |> Enum.reduce(MapSet.new(), fn
+        [pattern, "#"], acc ->
+          pattern = pattern |> String.graphemes()
+          MapSet.put(acc, pattern)
+
+        [_pattern, "."], acc ->
+          acc
       end)
 
     %Pots{state | spread_rules: spread_rules}
   end
 
-  def grow_pots_generations(state, generations) do
-    grow_pots_generations(state, generations, 0)
+  def pass_generations(state, generations) do
+    pass_generations(state, 0, generations)
   end
 
-  def grow_pots_generations(state, done, done), do: state
+  def pass_generations(state, equal, equal), do: state
 
-  def grow_pots_generations(state, generations, count) do
+  def pass_generations(state, count, total) do
     state
     |> grow_pots()
-    |> grow_pots_generations(generations, count + 1)
+    |> pass_generations(count + 1, total)
   end
 
-  def grow_pots(
-        %Pots{
-          current_state: current_state,
-          spread_rules: spread_rules,
-          leftmost: leftmost
-        } = state
-      ) do
-    current_state = [".", ".", ".", "." | current_state]
-    {next_generation, leftmost} = pass_one_generation(current_state, spread_rules, leftmost - 3)
+  def grow_pots(%Pots{current_state: current_state, spread_rules: spread_rules}) do
+    {leftmost, rightmost} = Enum.min_max(current_state)
 
-    %Pots{state | current_state: next_generation, leftmost: leftmost}
+    new_state =
+      (leftmost - 4)..(rightmost + 4)
+      |> Enum.chunk_every(5, 1, :discard)
+      |> Enum.filter(fn indices ->
+        plants =
+          Enum.map(indices, fn i -> if MapSet.member?(current_state, i), do: "#", else: "." end)
+
+        MapSet.member?(spread_rules, plants)
+      end)
+      |> Enum.map(fn [_, _, c, _, _] -> c end)
+      |> MapSet.new()
+
+    %Pots{current_state: new_state, spread_rules: spread_rules}
   end
 
-  def pass_one_generation(current_state, spread_rules, leftmost) do
-    pass_one_generation(:first, current_state, spread_rules, [], leftmost)
+  def count_total(state) do
+    state
+    |> Map.fetch!(:current_state)
+    |> Enum.sum()
   end
 
-  def pass_one_generation(nil, [".", ".", ".", ".", "."], _, acc, leftmost) do
-    {Enum.reverse(acc), leftmost}
+  ##########
+  # PART 2 #
+  ##########
+  def part_2(input \\ File.read!("./input.txt")) do
+    input
+    |> parse_input()
+    |> find_stability()
   end
 
-  def pass_one_generation(:first, [l2, l1, c, r1, r2 | tail], spread_rules, acc, leftmost) do
-    case Map.fetch(spread_rules, [l2, l1, c, r1, r2]) do
-      {:ok, pot} ->
-        pass_one_generation(nil, [l1, c, r1, r2 | tail], spread_rules, [pot | acc], leftmost + 1)
+  def find_stability(state) do
+    Enum.reduce_while(1..50_000_000_000, {state, 0, []}, fn i, {state, prev, diffs} ->
+      new_state = grow_pots(state)
+      count = count_total(new_state)
+      diff = count - prev
+      diffs = [diff | diffs]
 
-      :error ->
-        pass_one_generation(:first, [l1, c, r1, r2 | tail], spread_rules, acc, leftmost + 1)
-    end
-  end
-
-  def pass_one_generation(nil, [l2, l1, c, r1, r2], spread_rules, acc, leftmost) do
-    case Map.fetch(spread_rules, [l2, l1, c, r1, r2]) do
-      {:ok, pot} ->
-        pass_one_generation(nil, [l1, c, r1, r2, "."], spread_rules, [pot | acc], leftmost)
-
-      :error ->
-        pass_one_generation(nil, [l1, c, r1, r2, "."], spread_rules, ["." | acc], leftmost)
-    end
-  end
-
-  def pass_one_generation(nil, [l2, l1, c, r1, r2 | tail], spread_rules, acc, leftmost) do
-    pot = Map.get(spread_rules, [l2, l1, c, r1, r2], ".")
-
-    pass_one_generation(nil, [l1, c, r1, r2 | tail], spread_rules, [pot | acc], leftmost)
-  end
-
-  def compute_sum(%{current_state: current_state, leftmost: leftmost}) do
-    current_state
-    |> Enum.reduce({0, leftmost}, fn
-      ".", {sum, index} -> {sum, index + 1}
-      "#", {sum, index} -> {sum + index, index + 1}
+      if length(diffs) < 10 do
+        {:cont, {new_state, count, diffs}}
+      else
+        case Enum.uniq(diffs) do
+          [uniq] -> {:halt, (50_000_000_000 - i) * uniq + count}
+          _not_uniq -> {:cont, {new_state, count, Enum.take(diffs, 10)}}
+        end
+      end
     end)
-    |> elem(0)
   end
 end

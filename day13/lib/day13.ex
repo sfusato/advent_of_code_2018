@@ -26,6 +26,12 @@ defmodule Day13 do
     |> tick()
   end
 
+  def part_2(input \\ File.read!("./input.txt")) do
+    input
+    |> parse_input()
+    |> tick_until_last_car()
+  end
+
   def parse_input(input) do
     input
     |> String.split("\n")
@@ -86,6 +92,40 @@ defmodule Day13 do
   end
 
   def find_crash(_, _, _, crash_coordinates), do: crash_coordinates
+
+  def tick_until_last_car(state) do
+    Enum.reduce_while(1..1_000_000, state, fn _i, state ->
+      new_carts =
+        state.carts
+        |> sort_carts()
+        |> find_last_car(%{}, state.map)
+
+      case new_carts do
+        {x, y} -> {:halt, {x, y}}
+        new_carts -> {:cont, %{state | carts: new_carts}}
+      end
+    end)
+  end
+
+  def find_last_car([], last_cart, _) when map_size(last_cart) == 1,
+    do: last_cart |> Map.keys() |> hd()
+
+  def find_last_car([], moved_carts, _world_map), do: moved_carts
+
+  def find_last_car([{{x, y}, cart} | still_carts], moved_carts, world_map) do
+    {{x, y}, cart} = move_cart({x, y}, cart, world_map)
+
+    if Map.has_key?(moved_carts, {x, y}) or
+         Enum.find_value(still_carts, false, fn {{xx, yy}, _} -> {xx, yy} == {x, y} end) do
+      moved_carts = Map.delete(moved_carts, {x, y})
+      still_carts = Enum.reject(still_carts, fn {{xx, yy}, _} -> {xx, yy} == {x, y} end)
+
+      find_last_car(still_carts, moved_carts, world_map)
+    else
+      moved_carts = Map.put(moved_carts, {x, y}, cart)
+      find_last_car(still_carts, moved_carts, world_map)
+    end
+  end
 
   def move_cart({x, y}, cart, world_map) do
     {x, y} =

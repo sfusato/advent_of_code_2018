@@ -20,7 +20,7 @@ defmodule Day13 do
       ...> \""")
       {0, 3}
   """
-  def part_1(input \\ File.read!("./default_input.txt")) do
+  def part_1(input \\ File.read!("./input.txt")) do
     input
     |> parse_input()
     |> tick()
@@ -28,7 +28,7 @@ defmodule Day13 do
 
   def parse_input(input) do
     input
-    |> String.split("\r\n")
+    |> String.split("\n")
     |> Enum.map(fn row -> row |> String.graphemes() |> Enum.with_index() end)
     |> Enum.with_index()
     |> Enum.reduce(%WorldMap{}, fn {row, y}, state ->
@@ -62,15 +62,7 @@ defmodule Day13 do
       new_carts =
         state.carts
         |> sort_carts()
-        |> Enum.reduce_while(%{}, fn {{x, y}, cart}, seen_carts ->
-          {{x, y}, cart} = move_cart({x, y}, cart, state.map)
-
-          if Map.has_key?(seen_carts, {x, y}) do
-            {:halt, {x, y}}
-          else
-            {:cont, Map.put(seen_carts, {x, y}, cart)}
-          end
-        end)
+        |> find_crash(%{}, state.map, nil)
 
       case new_carts do
         {x, y} -> {:halt, {x, y}}
@@ -78,6 +70,22 @@ defmodule Day13 do
       end
     end)
   end
+
+  def find_crash([], moved_carts, _world_map, nil), do: moved_carts
+
+  def find_crash([{{x, y}, cart} | still_carts], moved_carts, world_map, nil) do
+    {{x, y}, cart} = move_cart({x, y}, cart, world_map)
+
+    if Map.has_key?(moved_carts, {x, y}) or
+         Enum.find_value(still_carts, false, fn {{xx, yy}, _} -> {xx, yy} == {x, y} end) do
+      find_crash([], [], world_map, {x, y})
+    else
+      moved_carts = Map.put(moved_carts, {x, y}, cart)
+      find_crash(still_carts, moved_carts, world_map, nil)
+    end
+  end
+
+  def find_crash(_, _, _, crash_coordinates), do: crash_coordinates
 
   def move_cart({x, y}, cart, world_map) do
     {x, y} =
@@ -126,6 +134,6 @@ defmodule Day13 do
   """
   def sort_carts(carts) do
     carts
-    |> Enum.sort_by(&{&1 |> elem(0) |> elem(1), &1 |> elem(0) |> elem(0)})
+    |> Enum.sort_by(fn {{x, y}, _} -> [y, x] end)
   end
 end

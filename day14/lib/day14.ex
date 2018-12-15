@@ -5,10 +5,9 @@ defmodule Day14 do
               elf_2: {7, 1},
               first_recipe_added: {3, 0},
               last_recipe_added: {7, 1},
-              no_recipes: nil,
-              last_ten: [],
               recipe_sequence: nil,
-              last_ten_sequence: ""
+              last_ten_sequence: "",
+              new_recipe: nil
   end
 
   @doc """
@@ -25,8 +24,13 @@ defmodule Day14 do
       "5941429882"
   """
   def part_1(no_recipes \\ 503_761) do
-    %Recipes{no_recipes: no_recipes}
-    |> cook()
+    %Recipes{}
+    |> Stream.iterate(&cook/1)
+    |> Enum.take(no_recipes + 10)
+    |> Enum.map(&Map.fetch!(&1, :new_recipe))
+    |> List.flatten()
+    |> Enum.slice((no_recipes - 1)..(no_recipes + 8))
+    |> Enum.join()
   end
 
   @doc """
@@ -49,62 +53,45 @@ defmodule Day14 do
   end
 
   def cook(state) do
-    Enum.reduce_while(1..1_000_000_000, state, fn _i, state ->
-      new_recipe = Integer.digits(elem(state.elf_1, 0) + elem(state.elf_2, 0))
+    new_recipe = Integer.digits(elem(state.elf_1, 0) + elem(state.elf_2, 0))
 
-      {new_last_recipe_added, new_scoreboard} = add_recipe_to_scoreboard(new_recipe, state)
+    {new_last_recipe_added, new_scoreboard} = add_recipe_to_scoreboard(new_recipe, state)
 
-      new_elf_1 = move_elf_forward(state.elf_1, new_scoreboard)
-      new_elf_2 = move_elf_forward(state.elf_2, new_scoreboard)
+    new_elf_1 = move_elf_forward(state.elf_1, new_scoreboard)
+    new_elf_2 = move_elf_forward(state.elf_2, new_scoreboard)
 
-      new_last_ten =
-        cond do
-          map_size(new_scoreboard) == state.no_recipes + 1 and length(new_recipe) == 2 ->
-            state.last_ten ++ tl(new_recipe)
-
-          map_size(new_scoreboard) > state.no_recipes ->
-            state.last_ten ++ new_recipe
-
-          true ->
-            state.last_ten
-        end
-
-      if length(new_last_ten) > 10 do
-        {:halt, new_last_ten |> Enum.slice(0..9) |> Enum.join()}
-      else
-        {:cont,
-         %{
-           state
-           | scoreboard: new_scoreboard,
-             last_recipe_added: new_last_recipe_added,
-             elf_1: new_elf_1,
-             elf_2: new_elf_2,
-             last_ten: new_last_ten
-         }}
-      end
-    end)
+    %{
+      state
+      | scoreboard: new_scoreboard,
+        last_recipe_added: new_last_recipe_added,
+        new_recipe: new_recipe,
+        elf_1: new_elf_1,
+        elf_2: new_elf_2
+    }
   end
 
   def add_recipe_to_scoreboard(new_recipe, state) do
+    index_last = elem(state.last_recipe_added, 1)
+
     case new_recipe do
       [x, y] ->
-        {{y, elem(state.last_recipe_added, 1) + 2},
+        {{y, index_last + 2},
          state.scoreboard
-         |> Map.put(state.last_recipe_added, {x, elem(state.last_recipe_added, 1) + 1})
+         |> Map.put(state.last_recipe_added, {x, index_last + 1})
          |> Map.put(
-           {x, elem(state.last_recipe_added, 1) + 1},
-           {y, elem(state.last_recipe_added, 1) + 2}
+           {x, index_last + 1},
+           {y, index_last + 2}
          )
-         |> Map.put({y, elem(state.last_recipe_added, 1) + 2}, state.first_recipe_added)}
+         |> Map.put({y, index_last + 2}, state.first_recipe_added)}
 
       [x] ->
-        {{x, elem(state.last_recipe_added, 1) + 1},
+        {{x, index_last + 1},
          state.scoreboard
          |> Map.put(
            state.last_recipe_added,
-           {x, elem(state.last_recipe_added, 1) + 1}
+           {x, index_last + 1}
          )
-         |> Map.put({x, elem(state.last_recipe_added, 1) + 1}, state.first_recipe_added)}
+         |> Map.put({x, index_last + 1}, state.first_recipe_added)}
     end
   end
 
@@ -133,7 +120,9 @@ defmodule Day14 do
         end
 
       if String.contains?(new_last_ten, state.recipe_sequence) do
-        {:halt, map_size(state.scoreboard) - String.length(state.recipe_sequence) + 1}
+        {:halt,
+         map_size(state.scoreboard) - String.length(state.recipe_sequence) +
+           String.length(new_recipe)}
       else
         {:cont,
          %{
